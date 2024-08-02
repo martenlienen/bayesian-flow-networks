@@ -68,7 +68,9 @@ def make_master_params(model_params):
     Copy model parameters into a (differently-shaped) list of full-precision
     parameters.
     """
-    master_params = _flatten_dense_tensors([param.detach().float() for param in model_params])
+    master_params = _flatten_dense_tensors(
+        [param.detach().float() for param in model_params]
+    )
     master_params = nn.Parameter(master_params)
     master_params.requires_grad = True
     return [master_params]
@@ -79,7 +81,9 @@ def model_grads_to_master_grads(model_params, master_params):
     Copy the gradients from the model parameters into the master parameters
     from make_master_params().
     """
-    master_params[0].grad = _flatten_dense_tensors([param.grad.data.detach().float() for param in model_params])
+    master_params[0].grad = _flatten_dense_tensors(
+        [param.grad.data.detach().float() for param in model_params]
+    )
 
 
 def master_params_to_model_params(model_params, master_params):
@@ -90,7 +94,9 @@ def master_params_to_model_params(model_params, master_params):
     # silently not copy any parameters.
     model_params = list(model_params)
 
-    for param, master_param in zip(model_params, unflatten_master_params(model_params, master_params)):
+    for param, master_param in zip(
+        model_params, unflatten_master_params(model_params, master_params)
+    ):
         param.detach().copy_(master_param)
 
 
@@ -212,9 +218,9 @@ def timestep_embedding(timesteps, dim, max_period=10000):
     :return: an [N x dim] Tensor of positional embeddings.
     """
     half = dim // 2
-    freqs = th.exp(-math.log(max_period) * th.arange(start=0, end=half, dtype=th.float32) / half).to(
-        device=timesteps.device
-    )
+    freqs = th.exp(
+        -math.log(max_period) * th.arange(start=0, end=half, dtype=th.float32) / half
+    ).to(device=timesteps.device)
     args = timesteps[:, None].float() * freqs[None]
     embedding = th.cat([th.cos(args), th.sin(args)], dim=-1)
     if dim % 2:
@@ -319,7 +325,9 @@ class Upsample(nn.Module):
     def forward(self, x):
         assert x.shape[1] == self.channels
         if self.dims == 3:
-            x = F.interpolate(x, (x.shape[2], x.shape[3] * 2, x.shape[4] * 2), mode="nearest")
+            x = F.interpolate(
+                x, (x.shape[2], x.shape[3] * 2, x.shape[4] * 2), mode="nearest"
+            )
         else:
             x = F.interpolate(x, scale_factor=2, mode="nearest")
         if self.use_conv:
@@ -404,13 +412,17 @@ class ResBlock(TimestepBlock):
             normalization(self.out_channels),
             SiLU(),
             nn.Dropout(p=dropout),
-            zero_module(conv_nd(dims, self.out_channels, self.out_channels, 3, padding=1)),
+            zero_module(
+                conv_nd(dims, self.out_channels, self.out_channels, 3, padding=1)
+            ),
         )
 
         if self.out_channels == channels:
             self.skip_connection = nn.Identity()
         elif use_conv:
-            self.skip_connection = conv_nd(dims, channels, self.out_channels, 3, padding=1)
+            self.skip_connection = conv_nd(
+                dims, channels, self.out_channels, 3, padding=1
+            )
         else:
             self.skip_connection = conv_nd(dims, channels, self.out_channels, 1)
 
@@ -422,7 +434,9 @@ class ResBlock(TimestepBlock):
         :param emb: an [N x emb_channels] Tensor of timestep embeddings.
         :return: an [N x C x ...] Tensor of outputs.
         """
-        return checkpoint(self._forward, (x, emb), self.parameters(), self.use_checkpoint)
+        return checkpoint(
+            self._forward, (x, emb), self.parameters(), self.use_checkpoint
+        )
 
     def _forward(self, x, emb):
         h = self.in_layers(x)
@@ -488,7 +502,9 @@ class QKVAttention(nn.Module):
         ch = qkv.shape[1] // 3
         q, k, v = th.split(qkv, ch, dim=1)
         scale = 1 / math.sqrt(math.sqrt(ch))
-        weight = th.einsum("bct,bcs->bts", q * scale, k * scale)  # More stable with f16 than dividing afterwards
+        weight = th.einsum(
+            "bct,bcs->bts", q * scale, k * scale
+        )  # More stable with f16 than dividing afterwards
         weight = th.softmax(weight.float(), dim=-1).type(weight.dtype)
         return th.einsum("bts,bcs->bct", weight, v)
 
@@ -597,7 +613,11 @@ class UNetModel(nn.Module):
             self.label_emb = nn.Embedding(num_classes, time_embed_dim)
 
         self.input_blocks = nn.ModuleList(
-            [TimestepEmbedSequential(conv_nd(dims, in_channels, model_channels, 3, padding=1))]
+            [
+                TimestepEmbedSequential(
+                    conv_nd(dims, in_channels, model_channels, 3, padding=1)
+                )
+            ]
         )
         input_block_chans = [model_channels]
         ch = model_channels
@@ -617,11 +637,17 @@ class UNetModel(nn.Module):
                 ]
                 ch = mult * model_channels
                 if ds in attention_resolutions:
-                    layers.append(AttentionBlock(ch, use_checkpoint=use_checkpoint, num_heads=num_heads))
+                    layers.append(
+                        AttentionBlock(
+                            ch, use_checkpoint=use_checkpoint, num_heads=num_heads
+                        )
+                    )
                 self.input_blocks.append(TimestepEmbedSequential(*layers))
                 input_block_chans.append(ch)
             if level != len(channel_mult) - 1:
-                self.input_blocks.append(TimestepEmbedSequential(Downsample(ch, conv_resample, dims=dims)))
+                self.input_blocks.append(
+                    TimestepEmbedSequential(Downsample(ch, conv_resample, dims=dims))
+                )
                 input_block_chans.append(ch)
                 ds *= 2
 
@@ -717,7 +743,9 @@ class UNetModel(nn.Module):
         """
         y = None
         flat_x = self.input_adapter(data, t)
-        x = flat_x.reshape(flat_x.size(0), self.image_size, self.image_size, self.in_channels)
+        x = flat_x.reshape(
+            flat_x.size(0), self.image_size, self.image_size, self.in_channels
+        )
         if self.project_input:
             x = self.input_projection(x)
         x_perm = x.permute(0, 3, 1, 2).contiguous()

@@ -41,7 +41,9 @@ def main(cfg: DictConfig) -> torch.Tensor:
     train_cfg = make_config(cfg.config_file)
     bfn = make_bfn(train_cfg.model)
 
-    bfn.load_state_dict(torch.load(cfg.load_model, weights_only=True, map_location="cpu"))
+    bfn.load_state_dict(
+        torch.load(cfg.load_model, weights_only=True, map_location="cpu")
+    )
     if torch.cuda.is_available():
         bfn.to("cuda")
     samples = bfn.sample(cfg.samples_shape, cfg.n_steps)

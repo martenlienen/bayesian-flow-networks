@@ -23,7 +23,13 @@ from torch.utils.data import DataLoader
 
 from data import make_datasets
 from model import BFN
-from utils_train import seed_everything, make_config, make_bfn, worker_init_function, make_progress_bar
+from utils_train import (
+    seed_everything,
+    make_config,
+    make_bfn,
+    worker_init_function,
+    make_progress_bar,
+)
 
 torch.set_float32_matmul_precision("high")
 torch.backends.cudnn.benchmark = True
@@ -44,29 +50,49 @@ def setup(cfg: DictConfig) -> Tuple[nn.Module, DataLoader]:
 
 
 @torch.inference_mode()
-def test(model: BFN, dataloader: DataLoader, n_steps: int, n_repeats: int) -> tuple[float, float, float, float]:
+def test(
+    model: BFN, dataloader: DataLoader, n_steps: int, n_repeats: int
+) -> tuple[float, float, float, float]:
     if torch.cuda.is_available():
         model.to("cuda")
     model.eval()
     losses, recon_losses = [], []
-    pbar = make_progress_bar(True, "[red]loss: {task.fields[loss]:.4f} repeat: {task.fields[r]}")
+    pbar = make_progress_bar(
+        True, "[red]loss: {task.fields[loss]:.4f} repeat: {task.fields[r]}"
+    )
     with pbar:
-        task_id = pbar.add_task("Test", visible=True, total=n_repeats * len(dataloader), loss=math.nan, r=0)
+        task_id = pbar.add_task(
+            "Test", visible=True, total=n_repeats * len(dataloader), loss=math.nan, r=0
+        )
         for r in range(n_repeats):
             _losses, _recon_losses = [], []
             for eval_batch in dataloader:
-                eval_batch = eval_batch.to("cuda") if torch.cuda.is_available() else eval_batch
+                eval_batch = (
+                    eval_batch.to("cuda") if torch.cuda.is_available() else eval_batch
+                )
                 loss = model(eval_batch, n_steps=n_steps).item()
                 recon_loss = model.compute_reconstruction_loss(eval_batch).item()
                 _losses.append(loss)
                 _recon_losses.append(recon_loss)
-                pbar.update(task_id, advance=1, loss=torch.tensor(_losses).mean() + torch.tensor(_recon_losses).mean(), r=r+1)
+                pbar.update(
+                    task_id,
+                    advance=1,
+                    loss=torch.tensor(_losses).mean()
+                    + torch.tensor(_recon_losses).mean(),
+                    r=r + 1,
+                )
             losses.append(torch.tensor(_losses).mean())
             recon_losses.append(torch.tensor(_recon_losses).mean())
     losses = torch.stack(losses)
-    loss_mean, loss_err = losses.mean(), losses.std(correction=0).item() / math.sqrt(len(losses))
+    loss_mean, loss_err = (
+        losses.mean(),
+        losses.std(correction=0).item() / math.sqrt(len(losses)),
+    )
     recon_losses = torch.stack(recon_losses)
-    recon_mean, recon_err = recon_losses.mean(), recon_losses.std(correction=0).item() / math.sqrt(len(recon_losses))
+    recon_mean, recon_err = (
+        recon_losses.mean(),
+        recon_losses.std(correction=0).item() / math.sqrt(len(recon_losses)),
+    )
     return loss_mean, loss_err, recon_mean, recon_err
 
 
@@ -86,8 +112,12 @@ def main(cfg: DictConfig) -> tuple[float, float, float, float]:
     train_cfg = make_config(cfg.config_file)
     model, dataloader = setup(train_cfg)
 
-    model.load_state_dict(torch.load(cfg.load_model, weights_only=True, map_location="cpu"))
-    loss_mean, loss_err, recon_mean, recon_err = test(model, dataloader, cfg.n_steps, cfg.n_repeats)
+    model.load_state_dict(
+        torch.load(cfg.load_model, weights_only=True, map_location="cpu")
+    )
+    loss_mean, loss_err, recon_mean, recon_err = test(
+        model, dataloader, cfg.n_steps, cfg.n_repeats
+    )
     print(f"For {cfg.n_steps} steps with {cfg.n_repeats} repeats:")
     print(f"Loss is {loss_mean:.6f} +- {loss_err:.6f}")
     print(f"Reconstruction Loss is {recon_mean:.6f} +- {recon_err:.6f}")

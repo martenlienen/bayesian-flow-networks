@@ -34,7 +34,13 @@ import numpy as np
 import torch
 from accelerate.logging import get_logger
 from omegaconf import OmegaConf, DictConfig
-from rich.progress import Progress, SpinnerColumn, MofNCompleteColumn, TimeElapsedColumn, TextColumn
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    MofNCompleteColumn,
+    TimeElapsedColumn,
+    TextColumn,
+)
 from torch.utils.data import DataLoader
 
 import model
@@ -62,7 +68,9 @@ def worker_init_function(worker_id: int) -> None:
     random.seed(worker_seed)
 
 
-def init_checkpointing(checkpoint_dir: Union[str, Path, None], run_id: str) -> Optional[Path]:
+def init_checkpointing(
+    checkpoint_dir: Union[str, Path, None], run_id: str
+) -> Optional[Path]:
     if checkpoint_dir is None:
         return None
     checkpoint_dir = Path(checkpoint_dir) / run_id
@@ -74,7 +82,9 @@ def init_checkpointing(checkpoint_dir: Union[str, Path, None], run_id: str) -> O
     return checkpoint_dir
 
 
-def checkpoint_training_state(checkpoint_dir, accelerator, ema_model, step: int, run_id: str):
+def checkpoint_training_state(
+    checkpoint_dir, accelerator, ema_model, step: int, run_id: str
+):
     if checkpoint_dir is None:
         return
     logger.info(f"Checkpointing training state to {checkpoint_dir} at step {step}")
@@ -97,7 +107,9 @@ def log_cfg(cfg, run: "neptune.Run"):
         cfg_temp_filename: Path = Path(tmpdir) / "cfg.yaml"
         cfg_temp_filename.write_text(OmegaConf.to_yaml(cfg, resolve=True))
         run["cfg"].upload(str(cfg_temp_filename), wait=True)
-    run["hyperparameters"] = stringify_unsupported(OmegaConf.to_container(cfg, resolve=True))
+    run["hyperparameters"] = stringify_unsupported(
+        OmegaConf.to_container(cfg, resolve=True)
+    )
 
 
 @torch.no_grad()
@@ -147,7 +159,11 @@ def make_dataloaders(cfg: DictConfig):
 
 
 def make_from_cfg(module, cfg, **parameters):
-    return getattr(module, cfg.class_name)(**cfg.parameters, **parameters) if cfg is not None else None
+    return (
+        getattr(module, cfg.class_name)(**cfg.parameters, **parameters)
+        if cfg is not None
+        else None
+    )
 
 
 def make_bfn(cfg: DictConfig):
@@ -158,7 +174,12 @@ def make_bfn(cfg: DictConfig):
     net = make_from_cfg(networks, cfg.net, data_adapters=data_adapters)
     bayesian_flow = make_from_cfg(model, cfg.bayesian_flow)
     distribution_factory = make_from_cfg(probability, cfg.distribution_factory)
-    loss = make_from_cfg(model, cfg.loss, bayesian_flow=bayesian_flow, distribution_factory=distribution_factory)
+    loss = make_from_cfg(
+        model,
+        cfg.loss,
+        bayesian_flow=bayesian_flow,
+        distribution_factory=distribution_factory,
+    )
     bfn = model.BFN(net=net, bayesian_flow=bayesian_flow, loss=loss)
     return bfn
 

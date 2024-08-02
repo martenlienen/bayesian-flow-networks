@@ -29,7 +29,8 @@ from utils_model import (
     safe_log,
     idx_to_float,
     float_to_idx,
-    quantize, sandwich,
+    quantize,
+    sandwich,
 )
 
 
@@ -79,11 +80,18 @@ class DiscretizedDistribution(DiscreteDistribution):
 
     @functools.cached_property
     def class_centres(self):
-        return torch.arange(self.half_bin_width - 1, 1, self.bin_width, device=self.device)
+        return torch.arange(
+            self.half_bin_width - 1, 1, self.bin_width, device=self.device
+        )
 
     @functools.cached_property
     def class_boundaries(self):
-        return torch.arange(self.bin_width - 1, 1 - self.half_bin_width, self.bin_width, device=self.device)
+        return torch.arange(
+            self.bin_width - 1,
+            1 - self.half_bin_width,
+            self.bin_width,
+            device=self.device,
+        )
 
     @functools.cached_property
     def mean(self):
@@ -96,7 +104,9 @@ class DiscretizedDistribution(DiscreteDistribution):
 
 
 class DiscretizedCtsDistribution(DiscretizedDistribution):
-    def __init__(self, cts_dist, num_bins, device, batch_dims, clip=True, min_prob=1e-5):
+    def __init__(
+        self, cts_dist, num_bins, device, batch_dims, clip=True, min_prob=1e-5
+    ):
         super().__init__(num_bins, device)
         self.cts_dist = cts_dist
         self.log_bin_width = log(self.bin_width)
@@ -106,7 +116,9 @@ class DiscretizedCtsDistribution(DiscretizedDistribution):
 
     @functools.cached_property
     def probs(self):
-        bdry_cdfs = self.cts_dist.cdf(self.class_boundaries.reshape([-1] + ([1] * self.batch_dims)))
+        bdry_cdfs = self.cts_dist.cdf(
+            self.class_boundaries.reshape([-1] + ([1] * self.batch_dims))
+        )
         bdry_slice = bdry_cdfs[:1]
         if self.clip:
             cdf_min = torch.zeros_like(bdry_slice)
@@ -131,7 +143,9 @@ class DiscretizedCtsDistribution(DiscretizedDistribution):
         cdf_hi = self.cts_dist.cdf(centre + self.half_bin_width)
         if self.clip:
             cdf_lo = torch.where(class_idx <= 0, torch.zeros_like(centre), cdf_lo)
-            cdf_hi = torch.where(class_idx >= (self.num_bins - 1), torch.ones_like(centre), cdf_hi)
+            cdf_hi = torch.where(
+                class_idx >= (self.num_bins - 1), torch.ones_like(centre), cdf_hi
+            )
             return cdf_hi - cdf_lo
         else:
             cdf_min = self.cts_dist.cdf(torch.zeros_like(centre) - 1)
@@ -170,7 +184,16 @@ class GMM(MixtureSameFamily):
 
 
 class DiscretizedGMM(DiscretizedCtsDistribution):
-    def __init__(self, params, num_bins, clip=False, min_std_dev=1e-3, max_std_dev=10, min_prob=1e-5, log_dev=True):
+    def __init__(
+        self,
+        params,
+        num_bins,
+        clip=False,
+        min_std_dev=1e-3,
+        max_std_dev=10,
+        min_prob=1e-5,
+        log_dev=True,
+    ):
         assert params.size(-1) % 3 == 0
         if min_std_dev < 0:
             min_std_dev = 1.0 / (num_bins * 5)
@@ -189,7 +212,16 @@ class DiscretizedGMM(DiscretizedCtsDistribution):
 
 
 class DiscretizedNormal(DiscretizedCtsDistribution):
-    def __init__(self, params, num_bins, clip=False, min_std_dev=1e-3, max_std_dev=10, min_prob=1e-5, log_dev=True):
+    def __init__(
+        self,
+        params,
+        num_bins,
+        clip=False,
+        min_std_dev=1e-3,
+        max_std_dev=10,
+        min_prob=1e-5,
+        log_dev=True,
+    ):
         assert params.size(-1) == 2
         if min_std_dev < 0:
             min_std_dev = 1.0 / (num_bins * 5)
@@ -313,7 +345,9 @@ class DiscretizedCategorical(DiscretizedDistribution):
 
 class CtsDistributionFactory:
     @abstractmethod
-    def get_dist(self, params: torch.Tensor, input_params=None, t=None) -> CtsDistribution:
+    def get_dist(
+        self, params: torch.Tensor, input_params=None, t=None
+    ) -> CtsDistribution:
         """Note: input_params and t are not used but kept here to be consistency with DiscreteDistributionFactory."""
         pass
 
@@ -339,7 +373,9 @@ class NormalFactory(CtsDistributionFactory):
 
     def get_dist(self, params, input_params=None, t=None):
         mean, log_std_dev = params.split(1, -1)[:2]
-        std_dev = safe_exp(log_std_dev).clamp(min=self.min_std_dev, max=self.max_std_dev)
+        std_dev = safe_exp(log_std_dev).clamp(
+            min=self.min_std_dev, max=self.max_std_dev
+        )
         return Normal(mean.squeeze(-1), std_dev.squeeze(-1), validate_args=False)
 
 
@@ -353,7 +389,9 @@ class DeltaFactory(CtsDistributionFactory):
 
 class DiscreteDistributionFactory:
     @abstractmethod
-    def get_dist(self, params: torch.Tensor, input_params=None, t=None) -> DiscreteDistribution:
+    def get_dist(
+        self, params: torch.Tensor, input_params=None, t=None
+    ) -> DiscreteDistribution:
         """Note: input_params and t are only required by PredDistToDataDistFactory."""
         pass
 
@@ -379,7 +417,15 @@ class DiscretizedCategoricalFactory(DiscreteDistributionFactory):
 
 
 class DiscretizedGMMFactory(DiscreteDistributionFactory):
-    def __init__(self, num_bins, clip=True, min_std_dev=1e-3, max_std_dev=10, min_prob=1e-5, log_dev=True):
+    def __init__(
+        self,
+        num_bins,
+        clip=True,
+        min_std_dev=1e-3,
+        max_std_dev=10,
+        min_prob=1e-5,
+        log_dev=True,
+    ):
         self.num_bins = num_bins
         self.clip = clip
         self.min_std_dev = min_std_dev
@@ -400,7 +446,15 @@ class DiscretizedGMMFactory(DiscreteDistributionFactory):
 
 
 class DiscretizedNormalFactory(DiscreteDistributionFactory):
-    def __init__(self, num_bins, clip=True, min_std_dev=1e-3, max_std_dev=10, min_prob=1e-5, log_dev=True):
+    def __init__(
+        self,
+        num_bins,
+        clip=True,
+        min_std_dev=1e-3,
+        max_std_dev=10,
+        min_prob=1e-5,
+        log_dev=True,
+    ):
         self.num_bins = num_bins
         self.clip = clip
         self.min_std_dev = min_std_dev
@@ -420,7 +474,13 @@ class DiscretizedNormalFactory(DiscreteDistributionFactory):
         )
 
 
-def noise_pred_params_to_data_pred_params(noise_pred_params: torch.Tensor, input_mean: torch.Tensor, t: torch.Tensor, min_variance: float, min_t=1e-6):
+def noise_pred_params_to_data_pred_params(
+    noise_pred_params: torch.Tensor,
+    input_mean: torch.Tensor,
+    t: torch.Tensor,
+    min_variance: float,
+    min_t=1e-6,
+):
     """Convert output parameters that predict the noise added to data, to parameters that predict the data."""
     data_shape = list(noise_pred_params.shape)[:-1]
     noise_pred_params = sandwich(noise_pred_params)
@@ -441,7 +501,9 @@ def noise_pred_params_to_data_pred_params(noise_pred_params: torch.Tensor, input
         noise_pred_mean, noise_pred_log_dev = noise_pred_params.chunk(2, -1)
     else:
         assert noise_pred_params.size(-1) % 3 == 0
-        mix_wt_logits, noise_pred_mean, noise_pred_log_dev = noise_pred_params.chunk(3, -1)
+        mix_wt_logits, noise_pred_mean, noise_pred_log_dev = noise_pred_params.chunk(
+            3, -1
+        )
         data_pred_params.append(mix_wt_logits)
     data_pred_mean = A - (B * noise_pred_mean)
     data_pred_mean = torch.where(alpha_mask, 0 * data_pred_mean, data_pred_mean)
@@ -464,5 +526,7 @@ class PredDistToDataDistFactory(DiscreteDistributionFactory):
         self.min_t = min_t
 
     def get_dist(self, params, input_params, t):
-        data_pred_params = noise_pred_params_to_data_pred_params(params, input_params[0], t, self.min_variance, self.min_t)
+        data_pred_params = noise_pred_params_to_data_pred_params(
+            params, input_params[0], t, self.min_variance, self.min_t
+        )
         return self.data_dist_factory.get_dist(data_pred_params)

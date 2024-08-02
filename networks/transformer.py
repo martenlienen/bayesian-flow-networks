@@ -70,19 +70,33 @@ class SelfAttention(nn.Module):
         self.is_causal = is_causal
 
     def forward(self, x):
-        B, T, C = x.size()  # batch size, sequence length, embedding dimensionality (n_embd)
+        B, T, C = (
+            x.size()
+        )  # batch size, sequence length, embedding dimensionality (n_embd)
 
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
         q, k, v = self.c_attn(x).split(self.n_embd, dim=2)
-        k = k.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
-        q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
-        v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
+        k = k.view(B, T, self.n_head, C // self.n_head).transpose(
+            1, 2
+        )  # (B, nh, T, hs)
+        q = q.view(B, T, self.n_head, C // self.n_head).transpose(
+            1, 2
+        )  # (B, nh, T, hs)
+        v = v.view(B, T, self.n_head, C // self.n_head).transpose(
+            1, 2
+        )  # (B, nh, T, hs)
 
         # self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         y = torch.nn.functional.scaled_dot_product_attention(
-            q, k, v, dropout_p=self.dropout if self.training else 0, is_causal=self.is_causal
+            q,
+            k,
+            v,
+            dropout_p=self.dropout if self.training else 0,
+            is_causal=self.is_causal,
         )
-        y = y.transpose(1, 2).contiguous().view(B, T, C)  # re-assemble all head outputs side by side
+        y = (
+            y.transpose(1, 2).contiguous().view(B, T, C)
+        )  # re-assemble all head outputs side by side
 
         # output projection
         y = self.resid_dropout(self.c_proj(y))
@@ -141,7 +155,12 @@ class GPT(nn.Module):
         self.transformer = nn.ModuleDict(
             dict(
                 drop=nn.Dropout(dropout),
-                h=nn.ModuleList([Block(n_head, n_embd, dropout, bias, is_causal) for _ in range(n_layer)]),
+                h=nn.ModuleList(
+                    [
+                        Block(n_head, n_embd, dropout, bias, is_causal)
+                        for _ in range(n_layer)
+                    ]
+                ),
                 ln_f=LayerNorm(n_embd, bias=bias),
             )
         )
@@ -164,7 +183,9 @@ class GPT(nn.Module):
                 torch.nn.init.normal_(p, mean=0.0, std=0.02 / math.sqrt(2 * n_layer))
 
         # report number of parameters
-        print(f"number of parameters: {sum(p.numel() for p in self.parameters() if p.requires_grad) / 1e6:.2f}M")
+        print(
+            f"number of parameters: {sum(p.numel() for p in self.parameters() if p.requires_grad) / 1e6:.2f}M"
+        )
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -182,7 +203,11 @@ class GPT(nn.Module):
         x = self.transformer.ln_f(x)
         if self.skip:
             x = torch.cat([x, x_in], -1)
-        logits = self.output_adapter(self.lm_head(x)) if self.output_adapter else self.lm_head(x)
+        logits = (
+            self.output_adapter(self.lm_head(x))
+            if self.output_adapter
+            else self.lm_head(x)
+        )
         return logits
 
     def get_optim_groups(self, weight_decay: float):
@@ -213,14 +238,24 @@ class GPT(nn.Module):
         param_dict = {pn: p for pn, p in self.named_parameters()}
         inter_params = decay & no_decay
         union_params = decay | no_decay
-        assert len(inter_params) == 0, "parameters %s made it into both decay/no_decay sets!" % (str(inter_params),)
-        assert (
-            len(param_dict.keys() - union_params) == 0
-        ), "parameters %s were not separated into either decay/no_decay set!" % (str(param_dict.keys() - union_params),)
+        assert len(inter_params) == 0, (
+            "parameters %s made it into both decay/no_decay sets!"
+            % (str(inter_params),)
+        )
+        assert len(param_dict.keys() - union_params) == 0, (
+            "parameters %s were not separated into either decay/no_decay set!"
+            % (str(param_dict.keys() - union_params),)
+        )
 
         # create the pytorch optimizer groups
         optim_groups = [
-            {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": weight_decay},
-            {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
+            {
+                "params": [param_dict[pn] for pn in sorted(list(decay))],
+                "weight_decay": weight_decay,
+            },
+            {
+                "params": [param_dict[pn] for pn in sorted(list(no_decay))],
+                "weight_decay": 0.0,
+            },
         ]
         return optim_groups

@@ -78,10 +78,18 @@ def make_datasets(cfg: DictConfig) -> tuple[Dataset, Dataset, Dataset]:
             train_transform_list.append(transforms.RandomHorizontalFlip())
         train_transform_list.append(MyLambda(rgb_image_transform, num_bins))
         train_transform = transforms.Compose(train_transform_list)
-        test_transform = transforms.Compose([transforms.ToTensor(), MyLambda(rgb_image_transform, num_bins)])
-        train_set = CIFAR10(root=cfg.data_dir, train=True, download=True, transform=train_transform)
-        val_set = CIFAR10(root=cfg.data_dir, train=True, download=True, transform=test_transform)
-        test_set = CIFAR10(root=cfg.data_dir, train=False, download=True, transform=test_transform)
+        test_transform = transforms.Compose(
+            [transforms.ToTensor(), MyLambda(rgb_image_transform, num_bins)]
+        )
+        train_set = CIFAR10(
+            root=cfg.data_dir, train=True, download=True, transform=train_transform
+        )
+        val_set = CIFAR10(
+            root=cfg.data_dir, train=True, download=True, transform=test_transform
+        )
+        test_set = CIFAR10(
+            root=cfg.data_dir, train=False, download=True, transform=test_transform
+        )
 
     elif cfg.dataset == "mnist":
         transform = transforms.Compose(
@@ -90,26 +98,52 @@ def make_datasets(cfg: DictConfig) -> tuple[Dataset, Dataset, Dataset]:
                 MyLambda(rgb_image_transform, num_bins),
             ]
         )
-        train_set = MNIST(root=cfg.data_dir, train=True, download=True, transform=transform)
-        val_set = MNIST(root=cfg.data_dir, train=True, download=True, transform=transform)
-        test_set = MNIST(root=cfg.data_dir, train=False, download=True, transform=transform)
+        train_set = MNIST(
+            root=cfg.data_dir, train=True, download=True, transform=transform
+        )
+        val_set = MNIST(
+            root=cfg.data_dir, train=True, download=True, transform=transform
+        )
+        test_set = MNIST(
+            root=cfg.data_dir, train=False, download=True, transform=transform
+        )
 
     elif cfg.dataset == "bin_mnist":
-        transform = transforms.Compose([transforms.ToTensor(), transforms.Lambda(bin_mnist_transform)])
-        train_set = MNIST(root=cfg.data_dir, train=True, download=True, transform=transform)
-        val_set = MNIST(root=cfg.data_dir, train=True, download=True, transform=transform)
-        test_set = MNIST(root=cfg.data_dir, train=False, download=True, transform=transform)
+        transform = transforms.Compose(
+            [transforms.ToTensor(), transforms.Lambda(bin_mnist_transform)]
+        )
+        train_set = MNIST(
+            root=cfg.data_dir, train=True, download=True, transform=transform
+        )
+        val_set = MNIST(
+            root=cfg.data_dir, train=True, download=True, transform=transform
+        )
+        test_set = MNIST(
+            root=cfg.data_dir, train=False, download=True, transform=transform
+        )
 
     elif cfg.dataset == "bin_mnist_cts":
-        transform = transforms.Compose([transforms.ToTensor(), transforms.Lambda(bin_mnist_cts_transform)])
-        train_set = MNIST(root=cfg.data_dir, train=True, download=True, transform=transform)
-        val_set = MNIST(root=cfg.data_dir, train=True, download=True, transform=transform)
-        test_set = MNIST(root=cfg.data_dir, train=False, download=True, transform=transform)
+        transform = transforms.Compose(
+            [transforms.ToTensor(), transforms.Lambda(bin_mnist_cts_transform)]
+        )
+        train_set = MNIST(
+            root=cfg.data_dir, train=True, download=True, transform=transform
+        )
+        val_set = MNIST(
+            root=cfg.data_dir, train=True, download=True, transform=transform
+        )
+        test_set = MNIST(
+            root=cfg.data_dir, train=False, download=True, transform=transform
+        )
 
     elif cfg.dataset == "text8":
-        train_set = Text8Dataset(cfg.data_dir, "train", download=True, seq_len=cfg.seq_len)
+        train_set = Text8Dataset(
+            cfg.data_dir, "train", download=True, seq_len=cfg.seq_len
+        )
         val_set = Text8Dataset(cfg.data_dir, "val", download=True, seq_len=cfg.seq_len)
-        test_set = Text8Dataset(cfg.data_dir, "test", download=True, seq_len=cfg.seq_len)
+        test_set = Text8Dataset(
+            cfg.data_dir, "test", download=True, seq_len=cfg.seq_len
+        )
     else:
         raise NotImplementedError(cfg.dataset)
 
@@ -118,8 +152,12 @@ def make_datasets(cfg: DictConfig) -> tuple[Dataset, Dataset, Dataset]:
         val_frac = cfg.get("val_frac", 0.01)
         train_val_split = [1.0 - val_frac, val_frac]
         seed = 2147483647
-        train_set = random_split(train_set, train_val_split, generator=torch.Generator().manual_seed(seed))[0]
-        val_set = random_split(val_set, train_val_split, generator=torch.Generator().manual_seed(seed))[1]
+        train_set = random_split(
+            train_set, train_val_split, generator=torch.Generator().manual_seed(seed)
+        )[0]
+        val_set = random_split(
+            val_set, train_val_split, generator=torch.Generator().manual_seed(seed)
+        )[1]
 
     return train_set, val_set, test_set
 
@@ -168,7 +206,9 @@ def prepare_text8(data_dir: pathlib.Path):
     train_ids.tofile(data_dir / "train.bin")
     val_ids.tofile(data_dir / "val.bin")
     test_ids.tofile(data_dir / "test.bin")
-    print(f"Saved to {data_dir / 'train.bin'}, {data_dir / 'val.bin'}, {data_dir / 'test.bin'}")
+    print(
+        f"Saved to {data_dir / 'train.bin'}, {data_dir / 'val.bin'}, {data_dir / 'test.bin'}"
+    )
 
     # save the meta information as well, to help us encode/decode later
     meta = {
@@ -183,7 +223,13 @@ def prepare_text8(data_dir: pathlib.Path):
 
 
 class Text8Dataset(Dataset):
-    def __init__(self, data_dir: Union[str, pathlib.Path], split: str, download: bool, seq_len: int):
+    def __init__(
+        self,
+        data_dir: Union[str, pathlib.Path],
+        split: str,
+        download: bool,
+        seq_len: int,
+    ):
         """
         seq_len should include context length. Example: seq_len=512 for modeling 256 chars with 256 char of context.
         context is only used for correct preparation of val/test sets.
@@ -198,7 +244,9 @@ class Text8Dataset(Dataset):
             if download:
                 prepare_text8(data_dir)
             else:
-                raise NotADirectoryError(f"dir {data_dir} does not exist and download is False")
+                raise NotADirectoryError(
+                    f"dir {data_dir} does not exist and download is False"
+                )
         self.data = np.memmap(data_dir / fname, np.uint16, "r")
 
     def __getitem__(self, index) -> torch.Tensor:
@@ -224,7 +272,9 @@ def batch_to_images(image_batch: torch.Tensor, ncols: int = None) -> plt.Figure:
         ncols = math.ceil(math.sqrt(len(image_batch)))
     if image_batch.size(-1) == 3:  # for color images (CIFAR-10)
         image_batch = (image_batch + 1) / 2
-    grid = make_grid(image_batch.permute(0, 3, 1, 2), ncols, pad_value=1).permute(1, 2, 0)
+    grid = make_grid(image_batch.permute(0, 3, 1, 2), ncols, pad_value=1).permute(
+        1, 2, 0
+    )
     fig = plt.figure(figsize=(grid.size(1) / 30, grid.size(0) / 30))
     plt.imshow(grid.cpu().clip(min=0, max=1), interpolation="nearest")
     plt.grid(False)

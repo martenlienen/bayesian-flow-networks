@@ -89,7 +89,9 @@ class UNetVDM(nn.Module):
         self.down_blocks = nn.ModuleList(
             UpDownBlock(
                 resnet_block=ResnetBlock(**resnet_params),
-                attention_block=AttentionBlock(**attention_params) if attention_everywhere else None,
+                attention_block=AttentionBlock(**attention_params)
+                if attention_everywhere
+                else None,
             )
             for _ in range(n_blocks)
         )
@@ -103,7 +105,9 @@ class UNetVDM(nn.Module):
         self.up_blocks = nn.ModuleList(
             UpDownBlock(
                 resnet_block=ResnetBlock(**resnet_params),
-                attention_block=AttentionBlock(**attention_params) if attention_everywhere else None,
+                attention_block=AttentionBlock(**attention_params)
+                if attention_everywhere
+                else None,
             )
             for _ in range(n_blocks + 1)
         )
@@ -124,7 +128,9 @@ class UNetVDM(nn.Module):
         t: torch.Tensor,
     ) -> torch.Tensor:
         flat_x = self.input_adapter(data, t)
-        x = flat_x.reshape(flat_x.size(0), self.image_size, self.image_size, self.input_channels)
+        x = flat_x.reshape(
+            flat_x.size(0), self.image_size, self.image_size, self.input_channels
+        )
         x_perm = x.permute(0, 3, 1, 2).contiguous()
         t = t.float().flatten(start_dim=1)[:, 0]
         t_embedding = get_timestep_embedding(t + 0.001, self.embedding_dim)
