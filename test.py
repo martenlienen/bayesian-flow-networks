@@ -13,10 +13,11 @@
 # limitations under the License.
 
 import math
+from contextlib import nullcontext
 from typing import Tuple
 
 import torch
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import DictConfig, OmegaConf
 from rich import print
 from torch import nn
 from torch.utils.data import DataLoader
@@ -24,11 +25,11 @@ from torch.utils.data import DataLoader
 from data import make_datasets
 from model import BFN
 from utils_train import (
-    seed_everything,
-    make_config,
     make_bfn,
-    worker_init_function,
+    make_config,
     make_progress_bar,
+    seed_everything,
+    worker_init_function,
 )
 
 torch.set_float32_matmul_precision("high")
@@ -60,10 +61,15 @@ def test(
     pbar = make_progress_bar(
         True, "[red]loss: {task.fields[loss]:.4f} repeat: {task.fields[r]}"
     )
-    with pbar:
-        task_id = pbar.add_task(
-            "Test", visible=True, total=n_repeats * len(dataloader), loss=math.nan, r=0
-        )
+    with pbar or nullcontext():
+        if pbar is not None:
+            task_id = pbar.add_task(
+                "Test",
+                visible=True,
+                total=n_repeats * len(dataloader),
+                loss=math.nan,
+                r=0,
+            )
         for r in range(n_repeats):
             _losses, _recon_losses = [], []
             for eval_batch in dataloader:
@@ -74,13 +80,14 @@ def test(
                 recon_loss = model.compute_reconstruction_loss(eval_batch).item()
                 _losses.append(loss)
                 _recon_losses.append(recon_loss)
-                pbar.update(
-                    task_id,
-                    advance=1,
-                    loss=torch.tensor(_losses).mean()
-                    + torch.tensor(_recon_losses).mean(),
-                    r=r + 1,
-                )
+                if pbar is not None:
+                    pbar.update(
+                        task_id,
+                        advance=1,
+                        loss=torch.tensor(_losses).mean()
+                        + torch.tensor(_recon_losses).mean(),
+                        r=r + 1,
+                    )
             losses.append(torch.tensor(_losses).mean())
             recon_losses.append(torch.tensor(_recon_losses).mean())
     losses = torch.stack(losses)
